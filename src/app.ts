@@ -3,13 +3,14 @@ import express, { Request, Response, json } from 'express';
 import helmet from "helmet";
 import cors from "cors";
 import { signToken } from './services/token.service';
+import accountRouter from "./routes/account.route"
 import { tokenMiddleware } from './middleware/token.middle';
 const app = express();
 
-
+app.use(express.json())
 app.use(helmet())
-app.use(cors)
-// app.use(chatRouter)
+app.use(cors())
+app.use("/api",accountRouter)
 
 
 
@@ -17,8 +18,8 @@ app.use(cors)
 // console.log(res);
 // app.use(tokenMiddleware);
 
-app.get('/hello',(req: Request, res:Response) => {
- return res.send('Hello, World!');
+app.get('/hello',tokenMiddleware,(req: Request, res:Response) => {
+   return res.send('Hello, World!');
 });
 
 export { app };

@@ -9,6 +9,7 @@ export const tokenMiddleware = async (req: Request, res: Response, next: NextFun
   }
 
   const verificationResponse = await verifyToken(token);
+  // console.log(verificationResponse);
 
   if (verificationResponse === "Token not found") {
     return res.status(400).json({ error: "Token not found" });

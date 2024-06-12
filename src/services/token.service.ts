@@ -45,22 +45,29 @@ export const verifyToken = async(token:string) =>{
         if(token === undefined || token === "" || !token){
             return "Token not found"
         }
-        const url:string = `${baseUrl}/signToken`
+        const url:string = `${baseUrl}/verify`
         const response = await axios.post(url, {}, {
             headers: {
               'Authorization': token
             }
           });
         if(response.status ===200){
+          console.log(response);
+          
             return response
         }
         if(response.status === 401){
+          console.log("401");
+          
             return "Invalid token"
         }
         if(response.status ===400){
             return "token not provided"
         }
-    } catch (error) {
-     return error   
+    } catch (error:any) {
+      if (error.message == "Request failed with status code 401"){
+        return "Invalid token"
+      }
+     return error  
     }
     }
