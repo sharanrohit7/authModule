@@ -1,6 +1,7 @@
 import { RowDataPacket } from "mysql2";
 import {db} from "../config/db"
 import bcrypt from "bcrypt"
+import { signToken } from "./token.service";
 interface createUser{
     id: string,
     email?: string,
@@ -255,5 +256,189 @@ export const updateAccount = async (data: UpdateUser) => {
 
     console.error('Error updating user:', error);
     return { error: error.message };
+  }
+};
+
+interface loginMobile {
+  phone: string,
+  password: string
+}
+
+export const loginPhone = async (data: loginMobile) => {
+  let conn;
+  try {
+    const { phone, password } = data;
+    conn = await (await connection).getConnection();
+
+    // Query to find the user by phone
+    const userSql = `
+    SELECT u.id, u.phone, u.password, ur.role_id, ur.sub_role_id, GROUP_CONCAT(m.module_name) AS modules
+    FROM users u
+    JOIN user_role ur ON u.id = ur.user_id
+    LEFT JOIN role_module rm ON rm.sub_role_id = ur.sub_role_id
+    LEFT JOIN modules m ON m.id = rm.module_id
+    WHERE u.phone = ?
+    GROUP BY u.id, ur.role_id, ur.sub_role_id;;
+    `;
+    const [rows]: [RowDataPacket[], any] = await conn.execute(userSql, [phone]);
+
+    // Check if the user exists
+    if (rows.length === 0) {
+      return { error: "Invalid phone or password" };
+    }
+
+    const user = rows[0];
+
+    // Compare the provided password with the hashed password in the database
+    const isPasswordMatch = await bcrypt.compare(password, user.password);
+    if (!isPasswordMatch) {
+      return { error: "Invalid phone or password" };
+    }
+
+    const token = await signToken(user.id,user.role_id)
+    if(token.error){
+      return {error: "Token issue"}
+    }
+    if (token){
+      return { 
+        message: 'User logged in successfully', 
+        user: {
+          id: user.id,
+          role_id: user.role_id,
+          sub_role_id: user.sub_role_id
+        },
+        modules: user.modules ? user.modules.split(',') : [],
+        token: token
+      };
+    }
+   
+
+  } catch (error: any) {
+    console.error('Error logging in user:', error);
+    return { error: error.message };
+
+  } finally {
+    if (conn) {
+      await conn.release();
+    }
+  }
+};
+
+interface loginEmail {
+  email: string,
+  password: string
+}
+
+// export const loginEmail = async (data: loginEmail) => {
+//   let conn;
+//   try {
+//     const { email, password } = data;
+//     conn = await (await connection).getConnection();
+
+//     // Query to find the user by phone
+//     const userSql = `
+//       SELECT u.id, u.email, u.password, ur.role_id, ur.sub_role_id, m.module_name
+//       FROM users u
+//       JOIN user_role ur ON u.id = ur.user_id
+//       LEFT JOIN role_module rm ON rm.sub_role_id = ur.sub_role_id
+//       LEFT JOIN modules m ON m.id = rm.module_id
+//       WHERE u.email = ?;
+//     `;
+//     const [rows]: [RowDataPacket[], any] = await conn.execute(userSql, [email]);
+
+//     // Check if the user exists
+//     if (rows.length === 0) {
+//       return { error: "Invalid email or password" };
+//     }
+
+//     const user = rows[0];
+
+//     // Compare the provided password with the hashed password in the database
+//     const isPasswordMatch = await bcrypt.compare(password, user.password);
+//     if (!isPasswordMatch) {
+//       return { error: "Invalid phone or password" };
+//     }
+// console.log("Modules   :",user.module_name);
+
+//     const token = await signToken(user.id,user.role_id)
+//     if (token){
+//       return { 
+//         message: 'User logged in successfully', 
+//         user: {
+//           id: user.id,
+//           role_id: user.role_id,
+//           sub_role_id: user.sub_role_id
+//         },
+//         modules: user.module_name,
+//         token: token
+//       };
+//     }
+   
+
+//   } catch (error: any) {
+//     console.error('Error logging in user:', error);
+//     return { error: error.message };
+
+//   } finally {
+//     if (conn) {
+//       await conn.release();
+//     }
+//   }
+// };
+
+export const loginEmail = async (data: loginEmail) => {
+  let conn;
+  try {
+    const { email, password } = data;
+    conn = await (await connection).getConnection();
+
+    // Query to find the user by email and aggregate module names
+    const userSql = `
+      SELECT u.id, u.email, u.password, ur.role_id, ur.sub_role_id, GROUP_CONCAT(m.module_name) AS modules
+      FROM users u
+      JOIN user_role ur ON u.id = ur.user_id
+      LEFT JOIN role_module rm ON rm.sub_role_id = ur.sub_role_id
+      LEFT JOIN modules m ON m.id = rm.module_id
+      WHERE u.email = ?
+      GROUP BY u.id, ur.role_id, ur.sub_role_id;
+    `;
+    const [rows]: [RowDataPacket[], any] = await conn.execute(userSql, [email]);
+
+    // Check if the user exists
+    if (rows.length === 0) {
+      return { error: "Invalid email or password" };
+    }
+
+    const user = rows[0];
+
+    // Compare the provided password with the hashed password in the database
+    const isPasswordMatch = await bcrypt.compare(password, user.password);
+    if (!isPasswordMatch) {
+      return { error: "Invalid email or password" };
+    }
+
+    // Generate a JWT token for the authenticated user
+    const token = await signToken(user.id, user.role_id);
+    if (token) {
+      return { 
+        message: 'User logged in successfully', 
+        user: {
+          id: user.id,
+          role_id: user.role_id,
+          sub_role_id: user.sub_role_id
+        },
+        modules: user.modules ? user.modules.split(',') : [],
+        token: token
+      };
+    }
+
+  } catch (error: any) {
+    console.error('Error logging in user:', error);
+    return { error: error.message };
+
+  } finally {
+    if (conn) {
+      await conn.release();
+    }
   }
 };
